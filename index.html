@@ -161,6 +161,15 @@ transition:all .3s;position:relative;overflow:hidden
 .field-error{border-color:#8a2a2a !important}
 .error-msg{color:#c45c5c;font-size:13px;margin-top:6px;display:none}
 
+/* EMAIL SUGGESTION */
+#email-suggestion{
+display:none;background:rgba(201,168,76,.12);border:1px solid var(--gold);
+border-radius:6px;padding:10px 14px;margin-top:8px;
+font-size:14px;color:var(--cream);cursor:pointer;transition:all .2s
+}
+#email-suggestion:hover{background:rgba(201,168,76,.2)}
+#email-suggestion span{color:var(--gold);font-weight:600;text-decoration:underline}
+
 /* STEPS */
 .steps-section{padding:48px 0 40px}
 .steps-title{
@@ -341,7 +350,8 @@ Warmly,<br>
 </div>
 </div>
 <div class="field-full">
-<input type="email" name="email" placeholder="Email address" required>
+<input type="email" name="email" placeholder="Email address" required id="emailInput">
+<div id="email-suggestion"></div>
 <div class="error-msg" id="emError">Valid email is required</div>
 </div>
 <div class="field-full">
@@ -441,12 +451,66 @@ Outlook / iCal
     if(!ln.value.trim()){ln.classList.add('field-error');document.getElementById('lnError').style.display='block';ok=false;}
     else{ln.classList.remove('field-error');document.getElementById('lnError').style.display='none';}
 
-    var emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if(!emailRe.test(em.value.trim())){em.classList.add('field-error');document.getElementById('emError').style.display='block';ok=false;}
+    var emailRe=/^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    var emailVal=em.value.trim();
+    var emailBad=!emailRe.test(emailVal)||/\.\./.test(emailVal);
+    if(emailBad){em.classList.add('field-error');document.getElementById('emError').style.display='block';ok=false;}
     else{em.classList.remove('field-error');document.getElementById('emError').style.display='none';}
 
     return ok;
   }
+
+  // Email typo detection
+  var EMAIL_TYPO_MAP={
+    'gmial.com':'gmail.com','gmal.com':'gmail.com','gamil.com':'gmail.com',
+    'gmaill.com':'gmail.com','gmail.con':'gmail.com','gmail.cim':'gmail.com',
+    'yaho.com':'yahoo.com','yahooo.com':'yahoo.com','yahoo.con':'yahoo.com',
+    'hotmial.com':'hotmail.com','hotmal.com':'hotmail.com',
+    'outlok.com':'outlook.com','outllook.com':'outlook.com'
+  };
+  var TLD_TYPOS={'.con':'.com','.cim':'.com','.cmo':'.com','.ocm':'.com'};
+
+  function checkEmailTypo(email){
+    if(!email||email.indexOf('@')===-1)return null;
+    var parts=email.split('@');
+    var domain=parts[1].toLowerCase();
+    // Check full domain typos
+    if(EMAIL_TYPO_MAP[domain])return parts[0]+'@'+EMAIL_TYPO_MAP[domain];
+    // Check TLD typos
+    for(var typo in TLD_TYPOS){
+      if(domain.slice(-typo.length)===typo){
+        return parts[0]+'@'+domain.slice(0,-typo.length)+TLD_TYPOS[typo];
+      }
+    }
+    return null;
+  }
+
+  var emailInput=document.getElementById('emailInput');
+  var suggestionBox=document.getElementById('email-suggestion');
+
+  function runTypoCheck(){
+    var val=emailInput.value.trim();
+    var fix=checkEmailTypo(val);
+    if(fix&&fix!==val){
+      suggestionBox.innerHTML='Did you mean <span>'+fix+'</span>?';
+      suggestionBox.style.display='block';
+      suggestionBox.onclick=function(){
+        emailInput.value=fix;
+        suggestionBox.style.display='none';
+        emailInput.classList.remove('field-error');
+        document.getElementById('emError').style.display='none';
+      };
+    }else{
+      suggestionBox.style.display='none';
+    }
+  }
+
+  emailInput.addEventListener('blur',runTypoCheck);
+  emailInput.addEventListener('input',function(){
+    // Debounce: only check after user pauses
+    clearTimeout(emailInput._typoTimer);
+    emailInput._typoTimer=setTimeout(runTypoCheck,600);
+  });
 
   form.addEventListener('submit',function(e){
     e.preventDefault();
